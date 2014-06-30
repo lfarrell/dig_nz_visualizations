@@ -9,7 +9,7 @@ class ProxyNZ {
      * @return mixed
      */
     private function base_call($page) {
-        $full_call = 'http://api.digitalnz.org/v3/records.json?api_key=9mgrhqKqmNiCmCasck4b&text=earthquake&and[category][]=Images&and[content_partner][]=UC+QuakeStudies&fields=title,source_url,thumbnail_url,creator,date&facets=creator,placename,year&per_page=100&page=' . $page;
+        $full_call = 'http://api.digitalnz.org/v3/records.json?api_key=9mgrhqKqmNiCmCasck4b&text=earthquake&and[category][]=Images&and[content_partner][]=UC+QuakeStudies&fields=title,source_url,thumbnail_url,creator,date,copyright&facets=creator,placename,year&per_page=100&page=' . $page;
 
         $ch = curl_init($full_call);
         curl_setopt($ch, CURLOPT_HEADER, 0);
@@ -43,6 +43,7 @@ class ProxyNZ {
             foreach($results as $result) {
                 $contrib = $result['creator'][0];
                 preg_match('/^\d{4}/', $result['date'][0], $matches);
+                $copyright = $result['copyright'][0];
 
                 if(array_key_exists($contrib, $facets)) {
                     $facets[$contrib] += 1;
@@ -58,6 +59,14 @@ class ProxyNZ {
                     // nothing
                 } else {
                     $facets[$matches[0]] = 1;
+                }
+
+                if(array_key_exists($copyright, $facets)) {
+                    $facets[$copyright] += 1;
+                } elseif($copyright == '') {
+                    // nothing
+                } else {
+                    $facets[$copyright] = 1;
                 }
             }
 
