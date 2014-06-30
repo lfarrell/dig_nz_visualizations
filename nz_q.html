@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link href='http://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+<!--    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script> -->
+    <script src="d3.v3.js" charset="utf-8"></script>
+    <script src="d3-tip.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.6.0/underscore-min.js"></script>
+    <style type="text/css">
+        #grid {
+            height: 600px;
+            width: 100%;
+            overflow: scroll;
+            background-color: black;
+      /*     -moz-column-count: 7;
+            -webkit-column-count: 7;
+            column-count: 6; */
+        }
+
+        #grid a {
+            float: left;
+            position: relative;
+        }
+
+        #grid a img {
+            position: relative;
+            height: 125px;
+            width: 160px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .description {
+            text-align: center;
+            z-index: 20;
+            width: 160px;
+            height: 0;
+            background-color:rgba(204,204,204,0.5);
+            color: black;
+            overflow: hidden;
+            font-size: .8em;
+            bottom: 0;
+            left: 0;
+            position: absolute;
+            -webkit-transition:height 1s ease 0s;
+            -moz-transition:height 1s ease 0s;
+            transition: height 1s ease 0s;
+            pointer-events: none;
+            margin-left: 5px;
+        }
+
+        .quake:hover .description {
+            height: 95px;
+        }
+
+        circle {
+            cursor: pointer;
+            opacity: 0.5;
+            font-size: 0.8;
+            fill: steelblue;
+        }
+    </style>
+</head>
+<body>
+<div id="grid"></div>
+<div id="metadata"></div>
+<script>
+(function() {
+    var margin = { top: 55, bottom: 45, left: 45, right: 30 },
+      //  grid_height = 600 - margin.top - margin.bottom,
+        metadata_height = 175 - margin.top - margin.bottom,
+        width = 1375 - margin.left - margin.right,
+        colors = d3.scale.category20c();
+
+   // d3.json("proxy.php?page=" + k).header("type", "GET").get(function(json) {
+    d3.json("proxy.php", function(json) {
+        /**
+         * Grab the images and display them.
+         */
+        datas = json; // save as global so data still available for transitions
+        var links = d3.select("#grid").selectAll("a")
+                .data(datas.photos)
+                .enter()
+                .append("a")
+                .attr("href", function(d) { return d.source_url; })
+                .attr("class", "quake")
+                .attr("target", "_blank");
+
+             links.append("img")
+                .attr("src", function(d) { return d.thumbnail_url; });
+
+             links.append("div")
+                .attr("class", "description")
+                .html(function(d) { return d.title; });
+
+        /**
+         * Pull out facets and collapse into single array of objects
+         */
+        var facet_objs = datas.facets;
+        var facets = [];
+
+        for(var i=0; i<facet_objs.length; i++) {
+            var tags = _.keys(facet_objs[i]);
+            var counts = _.values(facet_objs[i]);
+
+            for(var j=0; j< tags.length; j++) {
+                if(tags[j] == "BeckerFraserPhotos") { tags[j] = "Becker Fraser Photos"; } // too long as one word, won't wrap
+
+                facets.push({"facet": tags[j], "count": counts[j]});
+            }
+        }
+
+        facets.sort(function (a, b) { // sort high to low
+            if (a.count > b.count) {
+                return 1;
+            }
+
+            if (a.count < b.count) {
+                return -1;
+            }
+
+            return 0;
+        });
+
+        /**
+         * Create and draw the metadata bubbles from the facets
+         */
+        var xScale = d3.scale.linear()
+            .domain(d3.extent(facets, function(d, i) { return i; }))
+            .range([width, 0]);
+
+        var svg = d3.select("#metadata").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", metadata_height + margin.top + margin.bottom);
+
+        var circles = svg
+            .selectAll("circle")
+            .data(facets)
+            .enter()
+            .append("g")
+            .append("circle")
+            .attr("transform", "translate("+ margin.left + "," + margin.top + ")")
+            .attr("cx", function(d, i) { return xScale(i); })
+            .attr("r", function(d) {
+                var area = Math.sqrt(d.count) * 2;
+                return area > 8 ? area : 8; // If too small it's very hard to see.
+            })
+            .on("click", function(d) {
+                var selected = d3.select(this).data();
+                if(selected[0].facet == "Becker Fraser Photos") { selected.facet = "BeckerFraserPhotos" }
+                var no_spaces = selected[0].facet.replace(/\s/g, '.');
+                var re = new RegExp(no_spaces, "g");
+                    console.log(no_spaces);
+                var subset = [];
+                var dt = datas.photos;
+
+                for(var i=0; i<dt.length; i++) {
+                   // console.log(dt[i].creator[0])
+                    if((typeof dt[i].date[0] !== "undefined" && dt[i].date[0].match(re)) || dt[i].creator[0].match(re)) {
+                        subset.push(dt[i]);
+                    }
+                }
+
+                var links = d3.select("#grid").selectAll("a")
+                    .data(subset)
+                    .transition()
+                    .attr("href", function(d) { return d.source_url; })
+                    .attr("class", "quake")
+                    .attr("target", "_blank");
+
+                d3.select("#grid").selectAll("a, img, div")
+                    .data(subset)
+                    .exit()
+                    .remove();
+            });
+
+        /**
+         * Add in the accompanying text
+         */
+        var text = d3.selectAll("g").append("text")
+            .attr("x", function(d, i) { return xScale(i) + 30})
+            .attr("y", function(d) { return margin.top + margin.bottom })
+            .attr("dy", 0)
+            .style("font-size", ".8em")
+            .text(function(d) { return d.facet; })
+            .call(wrap, xScale(i));
+    });
+
+    /**
+     * From Mike Bostock's
+     * @param text
+     * @param width
+     */
+    function wrap(text) {
+        text.each(function() {
+            var text = d3.select(this),
+                    width = 20,
+                    words = text.text().split(/\s+/).reverse(),
+                    word,
+                    line = [],
+                    lineNumber = 0,
+                    lineHeight = 1.1, // ems
+                    x = text.attr("x"),
+                    y = text.attr("y"),
+                    dy = parseFloat(text.attr("dy")),
+                    tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+            while (word = words.pop()) {
+                line.push(word);
+                tspan.text(line.join(" "));
+                if (tspan.node().getComputedTextLength() > width) {
+                    line.pop();
+                    tspan.text(line.join(" "));
+                    line = [word];
+                    tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                }
+            }
+        });
+    }
+})();
+</script>
+</body>
+</html>

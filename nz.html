@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <link href='http://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+    <style type="text/css">
+        body {
+            font-family: 'Roboto', sans-serif;
+            font-size: 14px;
+        }
+
+        #map { height: 550px; }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            padding: 5px;
+            stroke: black;
+            shape-rendering: crispEdges;
+        }
+
+        circle {
+            -webkit-transition: fill-opacity 250ms linear;
+            fill-opacity: 1;
+        }
+
+        .selecting circle {
+          fill-opacity: .4;
+        }
+
+        .selecting circle.selected {
+            stroke: #f00;
+            fill-opacity: 1;
+        }
+
+        .brush .extent {
+          fill-opacity: .1;
+          shape-rendering: crispEdges;
+        }
+
+        div.tooltip {
+            position: absolute;
+            text-align: center;
+            width:  auto;
+            height: auto;
+            padding: 5px;
+            fill: black;
+            z-index: 9999;
+            font: 12px Arial,sans-serif;
+            background: whitesmoke;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="chart"></div>
+<script>
+    var api = 'http://api.digitalnz.org/v3/records.json?api_key=9mgrhqKqmNiCmCasck4b&text=earthquake&and[category][]=Images&and[content_partner][]=UC+QuakeStudies&sort=date&direction=asc&per_page=100&page=1';
+     /*
+    * Map
+     */
+    var map = L.map('map').setView([-43.532, 172.636], 12);
+    // Initialize the SVG layer
+//	map._initPathRoot();
+
+    L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+	    attribution: '&copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
+        maxZoom: 20
+    }).addTo(map);
+
+    var popup = L.marker([-43.5, 172.5])
+            .addTo(map);
+
+    var circle = L.circle([-43.5, 172.6], 500, {
+        color: 'red',
+        fillColor: 'blue',
+        fillOpacity: 0.5
+    }).addTo(map);
+   /*
+    * Slider
+    */
+    var margin = {top: 20, right: 40, left: 70, bottom: 80},
+        width = 800 - margin.left - margin.right,
+        height = 225 - margin.top - margin.bottom;
+
+    var tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+    var date_format = d3.time.format("%Y-%m-%d").parse;
+    var time_format = d3.time.format("%H:%M").parse;
+
+    var xScale = d3.time.scale()
+           .domain([date_format("2010-06-01"),date_format("2011-12-31")])
+           .range([0, width]);
+
+    var yScale = d3.time.scale()
+          .domain([time_format("23:59"), time_format("00:00")])
+          .range([0, height]);
+
+    // Create Axis
+    var xAxis = d3.svg.axis()
+          .scale(xScale)
+          .orient("bottom")
+          .tickFormat(d3.time.format("%b %Y"));
+
+    var yAxis = d3.svg.axis()
+         .scale(yScale)
+         .orient("left")
+         .tickFormat(d3.time.format("%H:%M"));
+
+    var svg = d3.select("#chart").append("svg")
+         .attr("width", width + margin.left + margin.right)
+         .attr("height", height + margin.top + margin.bottom);
+
+    svg.append("g")
+         .attr("class", "x axis")
+         .attr("transform", "translate("+ margin.left + "," + (height + margin.top) + ")")
+         .call(xAxis);
+
+    svg.append("text")
+         .attr("x", width / 2)
+         .attr("y", height + margin.bottom)
+         .style("text-anchor", "end")
+         .text("Date of Earthquake");
+
+    svg.append("g")
+         .attr("class", "y axis")
+         .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+         .call(yAxis);
+
+    function brushstart() {
+        svg.classed("selecting", true);
+    }
+
+    function brushmove() {
+        var s = brush.extent();
+        circle.classed("selected", function(d) { return s[0] <= format(d.date) && format(d.date) <= s[1]; });
+        var selected = d3.selectAll(".selected").data();
+        //render(selected);
+    }
+
+    function brushend() {
+        svg.classed("selecting", !d3.event.target.empty());
+    }
+</script>
+</body>
+</html>
